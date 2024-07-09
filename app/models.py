@@ -13,6 +13,8 @@ class User(db.Model):
                                              unique=True)
     password_hash: so.Mapped[Optional[str]] = so.mapped_column(sa.String(256))
 
+    #when the class is not yet declared then we argument is a string i.e 'Post' not Post
+    #Writeonlymapped is used because posts is a collection  type of Posts. One user can have multiple posts 
     posts: so.WriteOnlyMapped['Post'] = so.relationship( back_populates='author' )
 
     def __repr__(self):
@@ -25,6 +27,8 @@ class Post(db.Model):
         index=True, default=lambda: datetime.now(timezone.utc)
     )
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey(User.id), index=True)
+
+    #user is already declared so no need to pass it as a string
 
     author: so.Mapped[User] = so.relationship( back_populates='posts')
 
