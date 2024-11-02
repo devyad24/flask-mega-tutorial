@@ -14,3 +14,4 @@ class Config:
     MAIL_SENDER = 'devyadav4211@gmail.com'
     POSTS_PER_PAGE = 20
     LANGUAGES = ['en', 'es', 'hi']
+    GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
