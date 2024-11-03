@@ -1,3 +1,4 @@
+from flask import current_app
 from google.oauth2 import service_account
 import os
 from google.cloud import translate_v2 as translate
@@ -6,7 +7,7 @@ from app.utils import googleSignup
 
 def get_google_credentials():
     try:
-        credentials = service_account.Credentials.from_service_account_file(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'))
+        credentials = service_account.Credentials.from_service_account_file(current_app.config['GOOGLE_APPLICATION_CREDENTIALS'])
         return credentials
     except Exception as e:
         raise e 

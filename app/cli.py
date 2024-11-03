@@ -1,9 +1,15 @@
 import os
-
+from flask import Blueprint
 import click
-from app import app
 
-@app.cli.group()
+'''
+Flask puts commands that are attached to blueprints under a group with the blueprint's name by default. 
+That would have caused these commands to be available as flask cli translate .... 
+To avoid the extra cli group, the cli_group=None is given to the blueprint.
+'''
+bp = Blueprint('cli', __name__, cli_group=None)
+
+@bp.cli.group()
 def translate():
     '''Translation and localization command'''
     pass
