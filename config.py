@@ -19,3 +19,4 @@ class Config:
     LANGUAGES = ['en', 'es', 'hi']
     GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
     GOOGLE_APPLICATION_CREDENTIALS = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+    ELASTICSEARCH_URL = os.environ.get('ELASTICSEARCH_URL')
