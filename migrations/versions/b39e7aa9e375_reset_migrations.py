@@ -1,8 +1,8 @@
-"""update follower
+"""reset migrations
 
-Revision ID: b76165c2cfa8
-Revises: 231c806c9bf4
-Create Date: 2024-10-12 16:45:32.213780
+Revision ID: b39e7aa9e375
+Revises: 
+Create Date: 2024-12-13 01:11:39.145455
 
 """
 from alembic import op
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'b76165c2cfa8'
-down_revision = '231c806c9bf4'
+revision = 'b39e7aa9e375'
+down_revision = None
 branch_labels = None
 depends_on = None
 
@@ -43,6 +43,7 @@ def upgrade():
     sa.Column('body', sa.String(length=140), nullable=False),
     sa.Column('timestamp', sa.DateTime(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('language', sa.String(length=5), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
