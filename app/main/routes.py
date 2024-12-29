@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
+from turtle import title
 from flask import render_template, flash, redirect, url_for, request, g, current_app
 from flask_login import  current_user, login_required
 from flask_babel import _, get_locale
 import sqlalchemy as sa
 from app import db
-from app.main.forms import EditProfileForm, EmptyForm, PostForm, SearchForm 
-from app.models import User, Post
+from app.main.forms import EditProfileForm, EmptyForm, MessageForm, PostForm, SearchForm 
+from app.models import Notification, User, Post, Message
 from langdetect import detect, LangDetectException
 from app.utils import googleSignup
 from app.main import bp
@@ -166,3 +167,54 @@ def user_popup(username):
     user = db.first_or_404(sa.select(User).where(User.username == username))
     form = EmptyForm()
     return render_template('user_popup.html', user=user, form=form)
+
+@bp.route('/send_message/<receiver>', methods=['GET','POST'])
+@login_required
+def send_message(receiver):
+    user = db.first_or_404(sa.select(User).where(User.username == receiver))
+    form = MessageForm()
+    if form.validate_on_submit():
+        msg = Message(author=current_user, receiver=user, body=form.message.data)
+        db.session.add(msg)
+        #note that the notification is for the user that the msg is being sent and not for current_user!
+        user.add_notification('unread_message_count', user.unread_messages_count())
+        db.session.commit()
+        flash(_("Your message has been sent."))
+        return redirect(url_for('main.user', username=receiver))
+    return render_template('send_message.html', title=_('Send Message'), form=form, receiver=receiver)
+
+@bp.route('/messages', methods=['GET'])
+@login_required
+def view_messages():
+    '''
+        we need to fetch all the message the user has gotten sorted by the message timestamp
+        just query messages_received first and render that
+    '''
+    current_user.last_message_read_time = datetime.now(timezone.utc)
+    #once the user opens the messages page meaning they read all notifications, so its safe to assume unread msgs = 0
+    current_user.add_notification('unread_message_count', 0)
+    db.session.commit()
+    page = request.args.get('page', 1, type=int)
+    print("current_user.messages_received", current_user.messages_received)
+    query = current_user.messages_received.select().order_by(Message.timestamp.desc())
+    msgs = db.paginate(query, page=page, per_page=current_app.config['POSTS_PER_PAGE'],
+                           error_out=False)
+    next_url = url_for('main.messages', page=msgs.next_num) if msgs.has_next else None
+    prev_url = url_for('main.messages', page=msgs.prev_num) if msgs.has_prev else None
+
+    return render_template('messages.html', messages=msgs, next_url=next_url, prev_url=prev_url)
+
+@bp.route('/notifications')
+@login_required
+def notifications():
+    since = request.args.get('since', 0.0, type=float)
+    query = current_user.notifications.select().where(
+        Notification.timestamp > since).order_by(Notification.timestamp.asc())
+    notifications = db.session.scalars(query)
+    return [
+        {
+            'name': n.name,
+            'data': n.get_data(),
+            'timestamp': n.timestamp
+        } for n in notifications
+    ]
