@@ -1,10 +1,13 @@
 from datetime import datetime, timezone
 from hashlib import md5
+import logging
 from time import time
 from typing import Optional
 from flask import current_app
 from flask_login import UserMixin
 import jwt
+import redis.exceptions
+import rq.exceptions
 import sqlalchemy as sa
 import sqlalchemy.orm as so
 from app import db, login
@@ -12,6 +15,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.search import add_to_index, remove_from_index, query_index
 from time import time
 import json
+from celery.result import AsyncResult
+import redis 
+import rq
 
 
 followers = sa.Table(
@@ -62,6 +68,8 @@ class User(UserMixin, db.Model):
     )
 
     notifications: so.WriteOnlyMapped['Notification'] = so.relationship(back_populates='user')
+
+    tasks: so.WriteOnlyMapped['Task'] = so.relationship(back_populates='user')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -144,6 +152,28 @@ class User(UserMixin, db.Model):
         #note I only added and didn't commit this notification in db yet!
         db.session.add(n)
         return n 
+
+    def launch_task(self, name, description, *args, **kwargs):
+        #droppping celery for now
+        # celery = current_app.extensions['celery']
+        # q_job = celery.send_task(f'app.tasks.{name}', self.id,
+        #                                         *args, **kwargs)
+        #create an rq job with the name/description later to store in db
+        rq_job = current_app.task_queue.enqueue(f'app.tasks.{name}', self.id, *args, **kwargs)
+        task = Task(id=rq_job.id, name=name, description=description,
+                    user=self)
+        db.session.add(task)
+        return task
+
+    def get_tasks_in_progress(self):
+        query = self.tasks.select().where(Task.complete == False)
+        return db.session.scalars(query)
+
+    #ensure that user cannot run multiple tasks of same type/name
+    def get_task_in_progress(self, name):
+        query = self.tasks.select().where(Task.name == name,
+                                          Task.complete == False)
+        return db.session.scalar(query)
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
@@ -240,3 +270,24 @@ class Notification(db.Model):
 
     def get_data(self):
         return json.loads(str(self.payload_json))
+
+class Task(db.Model):
+    id: so.Mapped[str] = so.mapped_column(sa.String(36), primary_key=True)
+    name: so.Mapped[str] = so.mapped_column(sa.String(128), index=True)
+    description: so.Mapped[Optional[str]] = so.mapped_column(sa.String(128))
+    user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey(User.id))
+    complete: so.Mapped[bool] = so.mapped_column(default=False)
+
+    user: so.Mapped[User] = so.relationship(back_populates='tasks')
+
+    def get_queued_job(self):
+        try:
+            rq_job = rq.job.Job.fetch(self.id, connection=current_app.redis)
+        except (redis.exceptions.RedisError, rq.exceptions.NoSuchJobError):
+            return None
+        return rq_job
+
+    def get_progress(self):
+        job = self.get_queued_job()
+        print("job progress", job.meta.get('progress', 0))
+        return job.meta.get('progress', 0) if job is not None else 100

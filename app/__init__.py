@@ -10,10 +10,28 @@ from flask_mail import Mail
 from flask_moment import Moment
 from flask_babel import Babel, lazy_gettext as _l
 from config import Config
+from celery import Celery, Task
+import rq
+from redis import Redis
 
 
 def get_locale():
     return request.accept_languages.best_match(current_app.config['LANGUAGES'])
+
+
+#The main init for creating a celery factory is to have celery task run with Task class, and its also nice to have celery setup all in factory method
+#Also it is important to note that these tasks will have flask application context, so that services like our database connections are available.
+#def celery_init_app(app: Flask) -> Celery:
+#   class FlaskTask(Task):
+#       def __call__(self, *args: object, **kwargs: object) -> object:
+#           with app.app_context():
+#               return self.run(*args, **kwargs)
+
+#   celery_app = Celery(app.name, task_cls=FlaskTask)
+#   celery_app.config_from_object(app.config["CELERY"])
+#   celery_app.set_default()
+#   app.extensions["celery"] = celery_app
+#   return celery_app
 
 
 db = SQLAlchemy()
@@ -36,8 +54,12 @@ def create_app(config_class=Config):
     mail.init_app(app)
     moment.init_app(app)
     babel.init_app(app, locale_selector=get_locale)
-
+    
+    app.config.from_prefixed_env()
+    # celery_init_app(app)
     app.elasticsearch = Elasticsearch([app.config['ELASTICSEARCH_URL']]) if app.config['ELASTICSEARCH_URL'] else None
+    app.redis = Redis.from_url(app.config['CACHE_HOST_URL'])
+    app.task_queue = rq.Queue('microblog-tasks', connection=app.redis)
 
     from app.errors import bp as errors_bp
     app.register_blueprint(errors_bp)

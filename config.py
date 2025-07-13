@@ -20,3 +20,9 @@ class Config:
     GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
     GOOGLE_APPLICATION_CREDENTIALS = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
     ELASTICSEARCH_URL = os.environ.get('ELASTICSEARCH_URL')
+    CACHE_HOST_URL = os.environ.get('CACHE_HOST_URL') or 'redis://'
+    CELERY = dict(
+        broker_url=os.environ.get('CACHE_HOST_URL'),
+        result_backend=os.environ.get('CACHE_HOST_URL'),
+        task_ignore_result=False,
+    )

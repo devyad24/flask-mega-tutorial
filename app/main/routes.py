@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from turtle import title
 from flask import render_template, flash, redirect, url_for, request, g, current_app
 from flask_login import  current_user, login_required
 from flask_babel import _, get_locale
@@ -10,6 +9,7 @@ from app.models import Notification, User, Post, Message
 from langdetect import detect, LangDetectException
 from app.utils import googleSignup
 from app.main import bp
+from celery.result import AsyncResult
 
 
 @bp.before_request
@@ -218,3 +218,29 @@ def notifications():
             'timestamp': n.timestamp
         } for n in notifications
     ]
+
+#@bp.route('/callceleryapp', methods=['POST'])
+#def call_celery_task():
+#    time_delay = request.form.get('delay')
+#    result = example.delay(int(time_delay))
+#    return {"result_id": result.id, "result_status": result.status, "result_data": result.result, "result_info":result.info}
+
+# @bp.route('/getjob', methods=['GET'])
+# def get_celery_task():
+#     job_id = request.form.get('job_id')
+#     result = AsyncResult(job_id)
+#     print(result)
+#     if result:
+#         return {"result_id": result.id, "result_status": result.status, "result_data": result.result, "result_info":result.info}
+#     else:
+#         return "ok job found"
+
+@bp.route('/export_posts')
+@login_required
+def export_posts():
+    if current_user.get_task_in_progress('export_posts'):
+        flash(_('An export posts task is currently in process'))
+    else:
+        current_user.launch_task('export_posts', _('Exporting Posts...'))
+        db.session.commit()
+    return redirect(url_for('main.user', username=current_user.username))
