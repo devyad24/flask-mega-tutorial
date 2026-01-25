@@ -4,14 +4,20 @@ from flask_login import  current_user, login_required
 from flask_babel import _, get_locale
 import sqlalchemy as sa
 from app import db
+from app import socketio
 from app.main.forms import EditProfileForm, EmptyForm, MessageForm, PostForm, SearchForm 
 from app.models import Notification, User, Post, Message
 from langdetect import detect, LangDetectException
 from app.utils import googleSignup
 from app.main import bp
 from celery.result import AsyncResult
+from flask_socketio import send, emit
+import json
 
 
+@socketio.on('my event')
+def handle_message(data):
+    print(f'Received message: ${data}')
 @bp.before_request
 def before_request():
     if current_user.is_authenticated:
@@ -179,6 +185,9 @@ def send_message(receiver):
         #note that the notification is for the user that the msg is being sent and not for current_user!
         user.add_notification('unread_message_count', user.unread_messages_count())
         db.session.commit()
+        notification = user.fetch_notification_data('unread_message_count')
+        notification_data = json.loads(notification.payload_json)
+        socketio.emit('notification', {'user_id': current_user.id, 'notification_data': notification_data, 'notification_type': notification.name})
         flash(_("Your message has been sent."))
         return redirect(url_for('main.user', username=receiver))
     return render_template('send_message.html', title=_('Send Message'), form=form, receiver=receiver)

@@ -141,6 +141,10 @@ class User(UserMixin, db.Model):
             return 
         return db.session.get(User, user_id)
     
+    def fetch_notification_data(self, name, timestamp = datetime(1900, 1, 1)):
+        query = sa.select(Notification).where(Notification.user_id == self.id, Notification.name == name, Notification.timestamp > timestamp)
+        return db.session.scalar(query)
+
     def unread_messages_count(self):
         last_read_time = self.last_message_read_time or datetime(1900, 1, 1)
         query = sa.select(Message).where(Message.receiver == self, Message.timestamp > last_read_time)

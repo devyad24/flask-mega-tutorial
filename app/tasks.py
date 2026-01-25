@@ -7,10 +7,13 @@ from flask import render_template
 import json
 import sys
 import sqlalchemy as sa
+from flask_socketio import SocketIO
+
 
 app = create_app()
 app.app_context().push()
 
+socketio = SocketIO(message_queue='redis://')
 
 def _set_task_progress(progress):
     job = get_current_job()
@@ -22,10 +25,12 @@ def _set_task_progress(progress):
         task = db.session.get(Task, job.get_id())
         print("Task inside _set_progress", task)
         task.user.add_notification('task_progress', {'task_id': job.get_id(), 'progress': progress})
+        
         if progress == 100:
             print("progress 100")
             task.complete = True
         db.session.commit()
+        socketio.emit('notification', {'notification_type': 'task_progress', 'notification_data': {'task_id': job.get_id(), 'progress': progress}})
 
 def export_posts(user_id):
     print("EMAIL",app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])

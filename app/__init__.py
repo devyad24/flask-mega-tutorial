@@ -1,3 +1,5 @@
+# from gevent import monkey
+# monkey.patch_all()
 import logging
 from logging.handlers import SMTPHandler, RotatingFileHandler
 import os
@@ -13,6 +15,7 @@ from config import Config
 from celery import Celery, Task
 import rq
 from redis import Redis
+from flask_socketio import SocketIO
 
 
 def get_locale():
@@ -42,6 +45,7 @@ login.login_message = _l('Please log in to access this page.')
 mail = Mail()
 moment = Moment()
 babel = Babel()
+socketio = SocketIO()
 
 
 def create_app(config_class=Config):
@@ -54,12 +58,14 @@ def create_app(config_class=Config):
     mail.init_app(app)
     moment.init_app(app)
     babel.init_app(app, locale_selector=get_locale)
+    socketio.init_app(app, message_queue='redis://', cors_allowed_origins="*")
     
     app.config.from_prefixed_env()
     # celery_init_app(app)
     app.elasticsearch = Elasticsearch([app.config['ELASTICSEARCH_URL']]) if app.config['ELASTICSEARCH_URL'] else None
     app.redis = Redis.from_url(app.config['CACHE_HOST_URL'])
     app.task_queue = rq.Queue('microblog-tasks', connection=app.redis)
+    app.extensions["socketio"] = socketio
 
     from app.errors import bp as errors_bp
     app.register_blueprint(errors_bp)
