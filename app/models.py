@@ -29,6 +29,15 @@ followers = sa.Table(
               primary_key=True)
 )
 
+post_likes = sa.Table(
+    'post_likes',
+    db.metadata,
+    sa.Column('user_id', sa.Integer, sa.ForeignKey('user.id'),
+              primary_key=True),
+    sa.Column('post_id', sa.Integer, sa.ForeignKey('post.id'),
+              primary_key=True)
+)
+
 class User(UserMixin, db.Model):
     id: so.Mapped[int] = so.mapped_column(primary_key=True)
     username: so.Mapped[str] = so.mapped_column(sa.String(64), index=True,
@@ -240,6 +249,25 @@ class Post(SearchableMixin, db.Model):
 
     author: so.Mapped[User] = so.relationship(back_populates='posts')
     language: so.Mapped[Optional[str]] = so.mapped_column(sa.String(5))
+
+    liked_by: so.WriteOnlyMapped['User'] = so.relationship(
+        secondary=post_likes,
+        primaryjoin=(post_likes.c.post_id == id),
+        secondaryjoin=(post_likes.c.user_id == User.id)
+    )
+
+    def like_count(self):
+        query = sa.select(sa.func.count()).select_from(post_likes).where(
+            post_likes.c.post_id == self.id)
+        return db.session.scalar(query)
+
+    def is_liked_by(self, user):
+        if not user.is_authenticated:
+            return False
+        query = sa.select(post_likes.c.user_id).where(
+            post_likes.c.post_id == self.id,
+            post_likes.c.user_id == user.id)
+        return db.session.scalar(query) is not None
 
     def __repr__(self):
         return '<Post {}>'.format(self.body)

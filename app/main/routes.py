@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
-from flask import render_template, flash, redirect, url_for, request, g, current_app
+from flask import render_template, flash, redirect, url_for, request, g, current_app, jsonify
 from flask_login import  current_user, login_required
 from flask_babel import _, get_locale
 import sqlalchemy as sa
 from app import db
 from app import socketio
 from app.main.forms import EditProfileForm, EmptyForm, MessageForm, PostForm, SearchForm 
-from app.models import Notification, User, Post, Message
+from app.models import Notification, User, Post, Message, post_likes
 from langdetect import detect, LangDetectException
 from app.utils import googleSignup
 from app.main import bp
@@ -144,7 +144,24 @@ def unfollow(username):
         return redirect(url_for('main.user', username=username))
     else:
         return redirect(url_for('main.index'))
-    
+
+
+@bp.route('/like/<int:post_id>', methods=['POST'])
+@login_required
+def like(post_id):
+    post = db.get_or_404(Post, post_id)
+    liked = post.is_liked_by(current_user)
+    if liked:
+        db.session.execute(post_likes.delete().where(
+            post_likes.c.post_id == post.id,
+            post_likes.c.user_id == current_user.id))
+    else:
+        db.session.execute(post_likes.insert().values(
+            post_id=post.id, user_id=current_user.id))
+    db.session.commit()
+    return jsonify({'liked': not liked, 'count': post.like_count()})
+
+
 @bp.route('/translate', methods=['POST']) 
 # @login_required
 def translate():

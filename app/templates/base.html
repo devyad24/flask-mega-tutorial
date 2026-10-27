@@ -13,6 +13,14 @@
         rel="stylesheet"
         integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
         crossorigin="true">
+    <style>
+      .like-widget { display: inline-flex; align-items: center; gap: .25rem; }
+      .like-button { display: inline-flex; align-items: center; background: none; border: 0; padding: 0; color: #6c757d; line-height: 1; cursor: pointer; }
+      .like-widget > span.like-button { cursor: default; }
+      .like-button:hover, .like-button.liked { color: #e0245e; }
+      .like-button:disabled { opacity: .5; cursor: wait; }
+      .like-button:focus-visible { outline: 2px solid #e0245e; outline-offset: 2px; }
+    </style>
   </head>
   <body>
     <nav class="navbar navbar-expand-lg bg-body-tertiary">
@@ -208,6 +216,37 @@
             taskSpan.innerText = progress;
           }
         }
+
+        function initialize_likes() {
+          const buttons = document.querySelectorAll('.like-button[data-post-id]');
+          for (const button of buttons) {
+            button.addEventListener('click', async function() {
+              const postId = button.dataset.postId;
+              button.disabled = true;
+              try {
+                const response = await fetch(`/like/${postId}`, {
+                  method: 'POST',
+                  headers: {'Accept': 'application/json'}
+                });
+                if (!response.ok) {
+                  throw new Error(`Like request failed with ${response.status}`);
+                }
+                const data = await response.json();
+                button.classList.toggle('liked', data.liked);
+                button.setAttribute('aria-pressed', data.liked ? 'true' : 'false');
+                const counter = document.getElementById(`like-count-${postId}`);
+                if (counter) {
+                  counter.textContent = data.count;
+                }
+              } catch (error) {
+                console.error(error);
+              } finally {
+                button.disabled = false;
+              }
+            });
+          }
+        }
+        document.addEventListener('DOMContentLoaded', initialize_likes);
 
     </script>
     {{ moment.include_moment() }}
